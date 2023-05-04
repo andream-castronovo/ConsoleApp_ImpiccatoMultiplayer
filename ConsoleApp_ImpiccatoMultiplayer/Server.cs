@@ -16,7 +16,7 @@ namespace ConsoleApp_ImpiccatoMultiplayer
         List<Thread> _allThreads = new List<Thread>();
         List<ServerClient> _clients = new List<ServerClient>();
 
-        public List<ServerClient> Clients { get; set; }
+        public List<ServerClient> Clients { get => _clients; }
 
         public int ClientConnessi { get => _clients.Count; }
 
@@ -84,10 +84,13 @@ namespace ConsoleApp_ImpiccatoMultiplayer
             }
         }
 
-        public void AspettaPlayer()
+        object _lockWaitClient = new object();
+        public ServerClient AspettaUnPlayer()
         {
             while (_clients.Count == 0)
                 Thread.Sleep(300);
+
+            return _clients[_clients.Count - 1];
         }
 
         void RiceviMessaggi(ServerClient client)
@@ -113,16 +116,17 @@ namespace ConsoleApp_ImpiccatoMultiplayer
                         handler.Close();
                         
                         _limit.Release();
-                        _clients.Remove(client);
+                        
+                        lock (_lockWaitClient)
+                            _clients.Remove(client);
                         return;
                     }
 
-                    data += Encoding.UTF8.GetString(bytes);
+                    data += Encoding.UTF8.GetString(bytes, 0, bytesRicevuti);
 
                 } while (!data.Contains("<EOF>"));
-                
-                client.Dati.Enqueue(data);
 
+                client.RicevutiDalClient.Enqueue(data.Replace("<EOF>",""));
             }
         }
 
@@ -131,16 +135,26 @@ namespace ConsoleApp_ImpiccatoMultiplayer
             toWho.Socket.Send(
                 Encoding.UTF8.GetBytes(message + "<EOF>")
             );
+            
         }
 
         public void InviaMessaggioBroadcast(string message)
         {
-            foreach (ServerClient c in _clients)
+            lock (_lockWaitClient)
             {
-                c.Socket.Send(Encoding.UTF8.GetBytes(message + "<EOF>"));
+                foreach (ServerClient c in _clients)
+                {
+                    c.Socket.Send(Encoding.UTF8.GetBytes(message + "<EOF>"));
+                }
             }
         }
 
+        public string AspettaRispostaClient(ServerClient c)
+        {
+            while (c.RicevutiDalClient.Count == 0)
+                Thread.Sleep(300);
+            return c.RicevutiDalClient.Dequeue();
+        }
 
 
     }
@@ -149,6 +163,6 @@ namespace ConsoleApp_ImpiccatoMultiplayer
     {
         public Socket Socket { get; set; }
         public Thread Thread { get; set; }
-        public Queue<string> Dati { get; set; }
+        public Queue<string> RicevutiDalClient { get; set; } = new Queue<string>();
     }
 }

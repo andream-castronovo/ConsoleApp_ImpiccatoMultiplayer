@@ -22,16 +22,7 @@ namespace ConsoleApp_ImpiccatoMultiplayer
             
             Console.CursorVisible = false;
 
-            string daTrovare = "Liquirizia"; // Input esterno
-
-            Thread t = new Thread(() => Gioco(daTrovare));
-
             MenuIniziale();
-
-
-            foreach (Thread th in _allThreads)
-                if (t.IsAlive)
-                    t.Join();
         }
 
 
@@ -84,7 +75,7 @@ namespace ConsoleApp_ImpiccatoMultiplayer
                     if (selezioneAttuale == 'A')
                         t = new Thread(ScegliParola) { Name = "ScegliParola" };
                     else if (selezioneAttuale == 'B')
-                        t = new Thread(IndovinaParola) { Name = "ScegliParola" };
+                        t = new Thread(IndovinaParola) { Name = "IndovinaParola" };
 
 
                     _allThreads.Add(t);
@@ -92,6 +83,12 @@ namespace ConsoleApp_ImpiccatoMultiplayer
                     esci = true;
                 }
 
+            }
+            
+            foreach (Thread t in _allThreads)
+            {
+                if (t.IsAlive)
+                    t.Join();
             }
 
             void StampaScelte()
@@ -142,21 +139,69 @@ namespace ConsoleApp_ImpiccatoMultiplayer
 
             Server s = new Server("127.0.0.1",11000,1);
             s.Start();
-            
+
             Scrivi("Attendo la connessione di un client... ");
-            s.AspettaPlayer();
+            ServerClient c = s.AspettaUnPlayer();
 
             Scrivi("Ho una connessione!\n");
             Scrivi("Ora devi scegliere la parola da far indovinare --> ");
-            
             string parola;
-
             InputParola(out parola);
 
-            Scrivi($"Parola scelta: {parola}\n");
-            s.InviaMessaggioBroadcast($"{OttieniStringaBase(parola)}<START>");
-            Scrivi("Ora il giocatore dovrà scrivere una lettera alla volta le cose. \n"); // TODO Rivedere le scritte
+            parola = parola.ToLower();
 
+            Scrivi($"Parola scelta: {parola}\n");
+
+            string ricerca = OttieniStringaBase(parola);
+            s.InviaMessaggioA(ricerca + "<START><EOF>", c);
+
+            bool gameOnGoing = true;
+            int tentativi = 6;
+            Scrivi("Ora il giocatore dovrà scrivere una lettera alla volta la parola.\n"); // TODO Rivedere le scritte
+
+            do
+            {
+                string output;
+
+                string input = s.AspettaRispostaClient(c);
+                Scrivi("Il client ha scritto: " + input + "\n");
+
+                char inputConvertito = input[0];
+                if (parola.Contains(inputConvertito+""))
+                {
+                    Scrivi("Lettera trovata!\n", fore: ConsoleColor.Green, lck: _lockConsole);
+                    for (int i = 0; i < parola.Length; i++)
+                    {
+                        if (parola[i] == inputConvertito)
+                            ricerca = ricerca.Substring(0, i) + parola[i] + ricerca.Substring(i + 1);
+                    }
+
+                    output = ricerca + "<EOF>";
+
+                    if (ricerca == parola)
+                    {
+                        gameOnGoing = false;
+                        //Scrivi($"Hai vinto con {TENTATIVI_TOTALI - tentativi} lettere sbagliate!\n", lck: _lockConsole);
+                        output = $"\"{ricerca}\": parola trovata! Hai vinto.<END_GAME_WON><EOF>";
+                    }
+
+
+                }
+                else
+                {
+                    tentativi--;
+                    output = $"Hai sbagliato! Tentativi rimasti: {tentativi}.<WRONG:{tentativi}><EOF>";
+
+                    // Scrivi("Lettera non trovata!" + (tentativi != 0 ? $"Hai ancora {tentativi} tentativi!" : "") + "\n", lck: _lockConsole);
+
+                    if (tentativi == 0)
+                        output = $"Hai finito i tentativi. Hai perso. La parola era: {parola}.<END_GAME_LOST><EOF>";
+                }
+
+                s.InviaMessaggioA(output, s.Clients[0]);
+                Scrivi("Invio al client: " + output + "\n");
+
+            } while (gameOnGoing && tentativi > 0);
 
         }
 
@@ -165,30 +210,26 @@ namespace ConsoleApp_ImpiccatoMultiplayer
         {
             Console.Clear();
 
-            Scrivi("Mi connetto...");
-            Client c = new Client("5.tcp.eu.ngrok.io", 19036);
-            Scrivi("Connesso!");
+            Scrivi("A quale server vuoi connetterti? SERVER:PORTA -> ");
+            string ip_port = Console.ReadLine(); // TODO Fare controlli IP:PORTA
+            Client c = new Client(ip_port.Split(':')[0], int.Parse(ip_port.Split(':')[1]));
+            Scrivi("Connesso!\n", fore: ConsoleColor.Green);
 
-            Scrivi("Attendi che l'host scelga la parola...");
-
+            Scrivi("Attendi che l'host scelga la parola..." + "\n");
 
             bool ok = false;
             do
             {
-                while (c.MessaggiDalServer.Count == 0)
-                    Thread.Sleep(300);
+                c.AspettaRispostaServer();
 
                 if (c.MessaggiDalServer.Peek().Contains("<START>"))
                     ok = true;
                 else
-                    Scrivi(c.MessaggiDalServer.Dequeue());
+                    Scrivi(c.MessaggiDalServer.Dequeue() + "\n");
             } while (!ok);
-
             Scrivi("Iniziamo\n\n");
-
-            Gioco(c.MessaggiDalServer.Dequeue().Replace("<START>",""), c);
-
             
+            Gioco(c.MessaggiDalServer.Dequeue().Replace("<START>",""), c);
         }
 
         static void Gioco(string stringaBase, Client c)
@@ -220,34 +261,26 @@ namespace ConsoleApp_ImpiccatoMultiplayer
 
                 char inputConvertito = input[0];
 
-                // TODO: Rivedere bene questa parte, ho sonno vado a dormire
-                c.InviaAlServer(inputConvertito.ToString());
+                
+                c.InviaAlServer(inputConvertito.ToString() + "<EOF>");
+                Scrivi("Invio al server: " + inputConvertito.ToString() + "\n");
                 c.AspettaRispostaServer();
-                string risposta = c.MessaggiDalServer.Dequeue();
+                string risposta = c.MessaggiDalServer.Dequeue(); // TODO: Si potrebbe implementare un nuovo tag tipo <CHECK>
+                                                                 // che viene inviato solo quando il server gli manda se la lettera
+                                                                 // è giusta o sbagliata.
 
-                if (daTrovare.Contains(input))
-                {
-                    Scrivi("Lettera trovata!\n", fore: ConsoleColor.Green, lck: _lockConsole);
-                    for (int i = 0; i < daTrovare.Length; i++)
-                    {
-                        if (daTrovare[i] == inputConvertito)
-                            ricerca = ricerca.Substring(0, i) + daTrovare[i] + ricerca.Substring(i + 1);
-                    }
 
-                    if (ricerca == daTrovare)
-                    {
-                        vittoria = true;
-                        Scrivi($"Hai vinto con {TENTATIVI_TOTALI - tentativi} lettere sbagliate!\n", lck: _lockConsole);
-                    }
-                }
+                if (risposta.Contains("<WRONG:"))
+                    tentativi = int.Parse(risposta.Split(new string[] { "<WRONG:" }, StringSplitOptions.None)[1][0].ToString());
+                else if (risposta.Contains("<END_GAME_WON>"))
+                    vittoria = true;
+                else if (risposta.Contains("<END_GAME_LOST>"))
+                    tentativi = 0;
                 else
-                {
-                    tentativi--;
-                    Scrivi("Lettera non trovata!" + (tentativi != 0 ? $"Hai ancora {tentativi} tentativi!" : "") + "\n", lck: _lockConsole);
+                    ricerca = risposta;
 
-                    if (tentativi == 0)
-                        Scrivi("Tentativi terminati. Mi spiace, hai perso.\n", lck: _lockConsole);
-                }
+                Scrivi(ProtocolliStringhe.RimuoviProtocolli(risposta) + "\n");
+                
 
             } while (!vittoria && tentativi > 0);
         }

@@ -70,7 +70,7 @@ namespace ConsoleApp_ImpiccatoMultiplayer
                         return;
                     }
 
-                    data += Encoding.UTF8.GetString(bytes);
+                    data += Encoding.UTF8.GetString(bytes, 0, bytesRicevuti);
 
                 } while (!data.Contains("<EOF>"));
 

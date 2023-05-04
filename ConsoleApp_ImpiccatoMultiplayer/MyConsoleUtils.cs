@@ -34,18 +34,23 @@ namespace ConsoleApp_PonteLevatoio
                 Console.BackgroundColor = back;
                 Console.SetCursorPosition(x, y);
                 Console.Write(testo);
-                return;
             }
+            else
+                lock (lck)
+                {
+                    Console.ForegroundColor = fore;
+                    Console.BackgroundColor = back;
+                    Console.SetCursorPosition(x, y);
+                    Console.Write(testo);
+                }
 
-            // Qui il codice verrà eseguito solo se non si entra nell'IF precedente
-            // quindi uso il lock.
-            lock (lck)
-            {
-                Console.ForegroundColor = fore;
-                Console.BackgroundColor = back;
-                Console.SetCursorPosition(x, y);
-                Console.Write(testo);
-            }
+            ResettaColori();
+        }
+
+        public static void ResettaColori()
+        {
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.BackgroundColor = ConsoleColor.Black;
         }
     }
 }
