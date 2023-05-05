@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,13 +26,21 @@ namespace ConsoleApp_ImpiccatoMultiplayer
             _ipDestinatario = ip;
             _portaDestinatario = port;
             
-            ApriConnessione();
+            ApriConnessione(Dns.GetHostEntry(_ipDestinatario).AddressList[0]);
         }
 
-        void ApriConnessione()
+        public Client(IPAddress ip, int port)
+        {
+            _ipDestinatario = ip.ToString();
+            _portaDestinatario = port;
+
+            ApriConnessione(ip);
+        }
+
+        void ApriConnessione(IPAddress ip)
         {
             //IPAddress ip = IPAddress.Parse(_ipDestinatario); // IP verso cui stabilire la connessione
-            IPAddress ip = Dns.GetHostEntry(_ipDestinatario).AddressList[0];
+            //IPAddress ip = Dns.GetHostEntry(_ipDestinatario).AddressList[0];
 
             IPEndPoint remoteEndPoint = new IPEndPoint(ip, _portaDestinatario);
 

@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
+using System.Net.Http.Headers;
 using System.Threading;
 using static ConsoleApp_PonteLevatoio.MyConsoleUtils;
 
@@ -137,7 +139,7 @@ namespace ConsoleApp_ImpiccatoMultiplayer
         {
             Console.Clear();
 
-            Server s = new Server("127.0.0.1",11000,1);
+            Server s = new Server("10.73.0.22",60107,1); // Su scuola 10.73.0.22
             s.Start();
 
             Scrivi("Attendo la connessione di un client... ");
@@ -209,10 +211,28 @@ namespace ConsoleApp_ImpiccatoMultiplayer
         static void IndovinaParola()
         {
             Console.Clear();
+            bool inOk = false;
+            bool lan = false;
+            do
+            {
+                Scrivi("LAN? (Y/N) -> ");
+                string s = Console.ReadLine();
+
+                lan = s.ToLower() == "y";
+                inOk = s.ToLower() == "y" || s.ToLower() == "n";
+                if (!inOk)
+                    Scrivi("Input non valido, puoi scrivere solo \"y\" o \"n\"",fore: ConsoleColor.Red);
+
+            } while (!inOk);
 
             Scrivi("A quale server vuoi connetterti? SERVER:PORTA -> ");
             string ip_port = Console.ReadLine(); // TODO Fare controlli IP:PORTA
-            Client c = new Client(ip_port.Split(':')[0], int.Parse(ip_port.Split(':')[1]));
+            Client c;
+            if (lan && !ip_port.Contains("localhost"))
+                c = new Client(IPAddress.Parse(ip_port.Split(':')[0]), int.Parse(ip_port.Split(':')[1]));
+            else
+                c = new Client(ip_port.Split(':')[0], int.Parse(ip_port.Split(':')[1]));
+
             Scrivi("Connesso!\n", fore: ConsoleColor.Green);
 
             Scrivi("Attendi che l'host scelga la parola..." + "\n");
@@ -283,6 +303,49 @@ namespace ConsoleApp_ImpiccatoMultiplayer
                 
 
             } while (!vittoria && tentativi > 0);
+        }
+
+        static void DisegnaImpiccato(int tentativiRimasti, int xBase, int yBase)
+        {
+            /*    ┌──┐
+             *    │ \O/
+             *    │  |
+             *    │ / \
+             *    │ 
+             */
+            // testa 3,1
+            // corpo 3,2
+            // braccio1 2,1
+            // braccio2 4,1
+            // gamba1 2,3
+            // gamba2 4,3
+
+            int daDisegnareFinoA = 6 - tentativiRimasti;
+
+            string standImpiccato = "┌──┐\n" + // 0,0
+                                    "│\n" +    // 0,1
+                                    "│\n" +    // 0,2
+                                    "│\n" +    // 0,3
+                                    "│";       // 0,4
+            Dictionary<int,string> corpoImpiccato = new Dictionary<int, string>
+            {
+                { 5,"O" },
+                { 4,"|" },
+                { 3,"\\" },
+                { 2,"/" },
+                { 1,"/" },
+                { 0,"\\" },
+            };
+
+            Scrivi(standImpiccato, x: xBase, y: yBase);
+
+            for (int i = 0; i < daDisegnareFinoA; i++)
+            {
+                Scrivi(corpoImpiccato[i], x: xBase, y: yBase);
+            }
+            
+
+            
         }
 
         private static string OttieniStringaBase(string daTrovare)
