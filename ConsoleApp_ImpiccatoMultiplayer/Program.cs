@@ -139,7 +139,10 @@ namespace ConsoleApp_ImpiccatoMultiplayer
         {
             Console.Clear();
 
-            Server s = new Server("10.73.0.22",60107,1); // Su scuola 10.73.0.22
+
+            string ip_porta = Console.ReadLine();
+
+            Server s = new Server(ip_porta.Split(':')[0], int.Parse(ip_porta.Split(':')[1]), 1); // TODO: Controlli IP:PORTA
             s.Start();
 
             Scrivi("Attendo la connessione di un client... ");
@@ -229,7 +232,7 @@ namespace ConsoleApp_ImpiccatoMultiplayer
             string ip_port = Console.ReadLine(); // TODO Fare controlli IP:PORTA
             Client c;
             if (lan && !ip_port.Contains("localhost"))
-                c = new Client(IPAddress.Parse(ip_port.Split(':')[0]), int.Parse(ip_port.Split(':')[1]));
+                c = new Client(IPAddress.Parse("127.0.0.1"), int.Parse(ip_port.Split(':')[1]));
             else
                 c = new Client(ip_port.Split(':')[0], int.Parse(ip_port.Split(':')[1]));
 
@@ -262,6 +265,7 @@ namespace ConsoleApp_ImpiccatoMultiplayer
 
             do
             {
+                DisegnaImpiccato(tentativi, 80, 4);
                 Scrivi($"Stato ricerca: {ricerca}\n", lck: _lockConsole);
                 Scrivi("Scrivi la lettera da cercare: ", lck: _lockConsole);
 
@@ -291,11 +295,19 @@ namespace ConsoleApp_ImpiccatoMultiplayer
 
 
                 if (risposta.Contains("<WRONG:"))
+                {
                     tentativi = int.Parse(risposta.Split(new string[] { "<WRONG:" }, StringSplitOptions.None)[1][0].ToString());
+                    DisegnaImpiccato(tentativi, 80, 4);
+                }
+                    
                 else if (risposta.Contains("<END_GAME_WON>"))
                     vittoria = true;
                 else if (risposta.Contains("<END_GAME_LOST>"))
+                {
                     tentativi = 0;
+                    DisegnaImpiccato(tentativi, 80, 4);
+                }
+
                 else
                     ricerca = risposta;
 
@@ -320,30 +332,33 @@ namespace ConsoleApp_ImpiccatoMultiplayer
             // gamba1 2,3
             // gamba2 4,3
 
-            int daDisegnareFinoA = 6 - tentativiRimasti;
-
-            string standImpiccato = "┌──┐\n" + // 0,0
-                                    "│\n" +    // 0,1
-                                    "│\n" +    // 0,2
-                                    "│\n" +    // 0,3
-                                    "│";       // 0,4
-            Dictionary<int,string> corpoImpiccato = new Dictionary<int, string>
+            string[] standImpiccato = 
+                {
+                "┌──┐",    // 0,0
+                "│",       // 0,1
+                "│",       // 0,2
+                "│",       // 0,3
+                "│" };     // 0,4
+            Dictionary<int,Tuple<int,string>> corpoImpiccato = new Dictionary<int, Tuple<int, string>>
             {
-                { 5,"O" },
-                { 4,"|" },
-                { 3,"\\" },
-                { 2,"/" },
-                { 1,"/" },
-                { 0,"\\" },
+                { 0, new Tuple<int,string>(31,"O")},
+                { 1, new Tuple<int,string>(32,"|")},
+                { 2,new Tuple<int,string>(21,"\\") },
+                { 3,new Tuple<int,string>(41,"/") },
+                { 4,new Tuple<int,string>(23,"/") },
+                { 5,new Tuple<int,string>(43,"\\") },
             };
-
-            Scrivi(standImpiccato, x: xBase, y: yBase);
-
-            for (int i = 0; i < daDisegnareFinoA; i++)
+            for (int i = 0; i<standImpiccato.Length; i++)
             {
-                Scrivi(corpoImpiccato[i], x: xBase, y: yBase);
+                Scrivi(standImpiccato[i], x: xBase, y: yBase+i);
             }
-            
+
+            for (int i = 0; i < 6 - tentativiRimasti; i++)
+            {
+                Scrivi(corpoImpiccato[i].Item2, x: xBase + corpoImpiccato[i].Item1 / 10, y: yBase + corpoImpiccato[i].Item1 % 10);
+            }
+
+            Scrivi("\n");
 
             
         }
